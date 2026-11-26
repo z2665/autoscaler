@@ -1,0 +1,69 @@
+name: Publish security images
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-ref:
+        description: Branch or tag containing the security backport
+        required: true
+        type: string
+      image-tag:
+        description: Image tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/cluster-autoscaler
+  IMAGE_TAG: ${{ inputs.image-tag }}
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout security source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and verify each architecture
+        working-directory: cluster-autoscaler
+        run: |
+          set -euo pipefail
+          for arch in amd64 arm64; do
+            image="${IMAGE_NAME}:${IMAGE_TAG}-${arch}"
+            docker buildx build --platform "linux/${arch}" \
+              --build-arg "GOARCH=${arch}" --load --provenance=false --sbom=false \
+              -t "$image" .
+            docker run --rm --platform "linux/${arch}" \
+              --entrypoint /cluster-autoscaler "$image" --version
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$HOME/.cache:/root/.cache" \
+              aquasec/trivy:0.76.2 image \
+              --exit-code 1 --scanners vuln --pkg-types os,library \
+              --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL "$image"
+          done
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish multi-architecture image
+        working-directory: cluster-autoscaler
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --push --provenance=false --sbom=false -t "${IMAGE_NAME}:${IMAGE_TAG}" .
