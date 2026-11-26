@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM --platform=$BUILDPLATFORM golang:1.26 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.4-bookworm AS builder
 
 WORKDIR /workspace
 
@@ -38,6 +38,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     fi
 
 FROM gcr.io/distroless/static:nonroot
+LABEL org.opencontainers.image.source="https://github.com/z2665/autoscaler" \
+      org.opencontainers.image.version="1.36.2-p1"
 ARG GOARCH
 COPY --from=builder /workspace/cluster-autoscaler-$GOARCH /cluster-autoscaler
 
