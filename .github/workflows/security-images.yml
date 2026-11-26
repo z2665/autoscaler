@@ -45,7 +45,11 @@ jobs:
               --build-arg "GOARCH=${arch}" --load --provenance=false --sbom=false \
               -t "$image" .
             docker run --rm --platform "linux/${arch}" \
-              --entrypoint /cluster-autoscaler "$image" --version
+              --entrypoint /cluster-autoscaler "$image" --help >/dev/null
+            container=$(docker create --platform "linux/${arch}" "$image")
+            docker cp "$container":/cluster-autoscaler "/tmp/cluster-autoscaler-${arch}"
+            docker rm "$container" >/dev/null
+            strings "/tmp/cluster-autoscaler-${arch}" | grep -F '1.36.2-p1' >/dev/null
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$HOME/.cache:/root/.cache" \
