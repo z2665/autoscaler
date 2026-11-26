@@ -25,7 +25,8 @@ RUN go mod download
 # Copy the rest of the source code
 COPY . .
 
-ARG GOARCH
+ARG TARGETARCH
+ARG GOARCH=$TARGETARCH
 ARG LDFLAGS
 ARG BUILD_TAGS
 
@@ -39,8 +40,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM gcr.io/distroless/static:nonroot
 LABEL org.opencontainers.image.source="https://github.com/z2665/autoscaler" \
-      org.opencontainers.image.version="1.36.2-p1"
-ARG GOARCH
+      org.opencontainers.image.version="1.36.2-p2"
+ARG TARGETARCH
+ARG GOARCH=$TARGETARCH
 COPY --from=builder /workspace/cluster-autoscaler-$GOARCH /cluster-autoscaler
 
 WORKDIR /
